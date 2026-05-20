@@ -11,7 +11,7 @@
     "db:migrate": "npx prisma migrate dev",
     "db:studio": "npx prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "postinstall": "chmod +x node_modules/.bin/prisma && npx prisma generate"
+    "postinstall": "npx prisma generate"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",
@@ -39,7 +39,7 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^11.11.17",
     "lucide-react": "^0.460.0",
-    "next": "15.1.0",
+    "next": "^16.2.6",
     "next-auth": "^5.0.0-beta.25",
     "openai": "^6.38.0",
     "prisma": "^5.22.0",
