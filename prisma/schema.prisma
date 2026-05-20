@@ -1,0 +1,468 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Profile
+  onboardingCompleted Boolean @default(false)
+  learningStyle       LearningStyle?
+  academicRiskLevel   RiskLevel     @default(LOW)
+  emotionalRiskLevel  RiskLevel     @default(LOW)
+  studyHoursGoal      Int           @default(4)
+  timezone            String        @default("America/Bogota")
+
+  // Relations
+  accounts         Account[]
+  sessions         Session[]
+  onboardingData   OnboardingData?
+  subjects         Subject[]
+  tasks            Task[]
+  habits           Habit[]
+  habitLogs        HabitLog[]
+  emotionalCheckins EmotionalCheckin[]
+  studySessions    StudySession[]
+  weeklyGoals      WeeklyGoal[]
+  recommendations  Recommendation[]
+  achievements     Achievement[]
+  notifications    Notification[]
+
+  @@map("users")
+}
+
+// ─── AUTH (NextAuth) ──────────────────────────────────────────────────────────
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── ONBOARDING ──────────────────────────────────────────────────────────────
+model OnboardingData {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Academic habits
+  studyHoursPerDay     Float
+  procrastinationLevel Int
+  organizationLevel    Int
+  studyMethod          StudyMethod
+  timeManagementScore  Int
+  distractionsLevel    Int
+
+  // Academic situation
+  currentSemester    String
+  academicGoal       String
+  studySchedule      Json
+  currentGPA         Float?
+
+  // Emotional health
+  stressLevel        Int
+  anxietyLevel       Int
+  motivationLevel    Int
+  energyLevel        Int
+  sleepHoursPerNight Float
+  academicSelfEsteem Int
+
+  // ESTE FALTABA
+  learningStyle LearningStyle
+
+  completedAt DateTime @default(now())
+
+  @@map("onboarding_data")
+}
+
+// ─── SUBJECTS ────────────────────────────────────────────────────────────────
+model Subject {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  code        String?
+  teacher     String?
+  credits     Int           @default(3)
+  color       String        @default("#6366F1")
+  semester    String
+  isActive    Boolean       @default(true)
+  targetGrade Float         @default(3.0)
+  minGrade    Float         @default(3.0)
+  status      SubjectStatus @default(IN_PROGRESS)
+
+  grades       Grade[]
+  tasks        Task[]
+  studySessions StudySession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subjects")
+}
+
+model Grade {
+  id        String @id @default(cuid())
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  name       String
+  score      Float
+  maxScore   Float   @default(5.0)
+  weight     Float   // Percentage weight (0-100)
+  type       GradeType
+  gradedAt   DateTime
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("grades")
+}
+
+// ─── TASKS ───────────────────────────────────────────────────────────────────
+model Task {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id])
+
+  title       String
+  description String?
+  dueDate     DateTime?
+  priority    Priority      @default(MEDIUM)
+  status      TaskStatus    @default(PENDING)
+  type        TaskType      @default(HOMEWORK)
+  estimatedMinutes Int?
+  actualMinutes    Int?
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("tasks")
+}
+
+// ─── HABITS ──────────────────────────────────────────────────────────────────
+model Habit {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  category    HabitCategory
+  icon        String        @default("✨")
+  color       String        @default("#6366F1")
+  frequency   HabitFrequency @default(DAILY)
+  targetDays  Json          // Array of weekdays [1,2,3,4,5]
+  isActive    Boolean       @default(true)
+  isSystemSuggested Boolean @default(false)
+  currentStreak Int         @default(0)
+  bestStreak    Int         @default(0)
+  totalCompletions Int      @default(0)
+
+  logs HabitLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("habits")
+}
+
+model HabitLog {
+  id      String @id @default(cuid())
+  habitId String
+  habit   Habit  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  completedAt DateTime @default(now())
+  notes       String?
+  mood        Int?     // 1-5
+
+  @@unique([habitId, completedAt])
+  @@map("habit_logs")
+}
+
+// ─── EMOTIONAL CHECK-INS ─────────────────────────────────────────────────────
+model EmotionalCheckin {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mood        Mood
+  stressLevel Int  // 1-10
+  energyLevel Int  // 1-10
+  motivation  Int  // 1-10
+  anxiety     Int  // 1-10
+  notes       String?
+  triggers    Json? // Array of strings
+
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@map("emotional_checkins")
+}
+
+// ─── STUDY SESSIONS ──────────────────────────────────────────────────────────
+model StudySession {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id])
+
+  startTime DateTime
+  endTime   DateTime?
+  duration  Int?     // Minutes
+  technique StudyTechnique @default(REGULAR)
+  notes     String?
+  rating    Int?     // 1-5 self-evaluation
+
+  createdAt DateTime @default(now())
+
+  @@map("study_sessions")
+}
+
+// ─── WEEKLY GOALS ────────────────────────────────────────────────────────────
+model WeeklyGoal {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  weekStart     DateTime
+  weekEnd       DateTime
+  studyHours    Float     @default(0)
+  targetHours   Float     @default(20)
+  tasksCompleted Int      @default(0)
+  tasksTarget    Int      @default(5)
+  habitsStreak  Int       @default(0)
+  overallScore  Float?
+  reflection    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekStart])
+  @@map("weekly_goals")
+}
+
+// ─── RECOMMENDATIONS ─────────────────────────────────────────────────────────
+model Recommendation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type     RecommendationType
+  title    String
+  body     String             @db.Text
+  priority Priority           @default(MEDIUM)
+  isRead   Boolean            @default(false)
+  isDismissed Boolean         @default(false)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  @@map("recommendations")
+}
+
+// ─── ACHIEVEMENTS ────────────────────────────────────────────────────────────
+model Achievement {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  badge       String
+  title       String
+  description String
+  unlockedAt  DateTime @default(now())
+
+  @@map("achievements")
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title   String
+  body    String
+  type    NotificationType
+  isRead  Boolean          @default(false)
+  link    String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+enum LearningStyle {
+  VISUAL
+  AUDITORY
+  KINESTHETIC
+  READING_WRITING
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum StudyMethod {
+  POMODORO
+  DEEP_WORK
+  SPACED_REPETITION
+  MIND_MAPPING
+  ACTIVE_RECALL
+  CORNELL_NOTES
+  MIXED
+}
+
+enum SubjectStatus {
+  IN_PROGRESS
+  PASSED
+  FAILED
+  WITHDRAWN
+}
+
+enum GradeType {
+  EXAM
+  QUIZ
+  HOMEWORK
+  PROJECT
+  PARTICIPATION
+  MIDTERM
+  FINAL
+  OTHER
+}
+
+enum TaskType {
+  HOMEWORK
+  EXAM_PREP
+  PROJECT
+  READING
+  PRACTICE
+  OTHER
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum HabitCategory {
+  STUDY
+  HEALTH
+  SLEEP
+  MINDFULNESS
+  ORGANIZATION
+  SOCIAL
+  OTHER
+}
+
+enum HabitFrequency {
+  DAILY
+  WEEKDAYS
+  WEEKENDS
+  CUSTOM
+}
+
+enum Mood {
+  VERY_BAD
+  BAD
+  NEUTRAL
+  GOOD
+  VERY_GOOD
+}
+
+enum StudyTechnique {
+  POMODORO
+  DEEP_WORK
+  SPACED_REPETITION
+  ACTIVE_RECALL
+  REGULAR
+  OTHER
+}
+
+enum RecommendationType {
+  ACADEMIC
+  EMOTIONAL
+  HABIT
+  PRODUCTIVITY
+  ALERT
+  ACHIEVEMENT
+}
+
+enum NotificationType {
+  TASK_DUE
+  HABIT_REMINDER
+  ACHIEVEMENT
+  WEEKLY_SUMMARY
+  RECOMMENDATION
+  SYSTEM
+}
