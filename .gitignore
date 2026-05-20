@@ -39,3 +39,8 @@ yarn-error.log*
 # Logs
 logs/
 *.log
+node_modules/
+.next/
+.env
+.vercel/
+prisma/dev.db
